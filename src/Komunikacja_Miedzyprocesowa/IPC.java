@@ -2,15 +2,17 @@ package Komunikacja_Miedzyprocesowa;
 
 
 import java.util.Vector;
+import proces.PCB;
 
-//import proces.PCB;
 
 /**
  * @author Olga Kryspin
  */
 public class IPC {
-    private Vector<Pipe> pipes = new Vector(); //wszystkie istniejące łącza w systemie
-
+   
+    public Vector<Pipe> pipes = new Vector(); //wszystkie istniejące łącza w systemie
+    public PCB PCBbox;
+    
     private int open(Pipe pipe, char sign) // otwiera w trybie:.. 
     {
         if (sign == 'w') // ...zapisu
@@ -72,7 +74,7 @@ public class IPC {
     //5. zwracam faktyczną liczbę zapisanych danych 
     public int write(String komunikat, String pn, int des) {
         boolean exists = true;
-
+        this.PCBbox = PCBbox;
 
         for (int i = 0; i < pipes.size(); i++) {
             if (pipes.get(i).pn.equals(pn)) {
@@ -122,27 +124,30 @@ public class IPC {
     //-ustawiam pola occupied bytes i free bytes i pn 
     //4. zwracam komunikat
 
-   public String read(int count,String pn) {
+   public String read(int count,String pn,PCB PCBbox) {
         boolean exists = false;
         String bufor;
-        int des = 0; 
+        int des = -1; 
+        this.PCBbox = PCBbox;
 
         for (int i = 0; i < pipes.size(); i++) {
             if (pipes.get(i).pn.equals(pn)) {
-                des= i; 
+                des = i; 
                 exists = true;
             }
         }
 
         if (exists == false) {
-            System.out.println("Takie lacze nie istnieje!");
-            return "-1";
+            System.out.println("Takie lacze JESZCZE nie istnieje!");
+            String s = PCBbox.working();
+            PCBbox.getproces(s).state=3;
+            //return "-1";
         }
 
        // int des = 0;
-        Pipe firstElement = pipes.firstElement();
-        des = pipes.indexOf(firstElement);
-
+        //Pipe firstElement = pipes.firstElement();
+        //des = pipes.indexOf(firstElement);
+        if(des!=-1){
         if (pipes.get(des).occupied_bytes == 0) {
             System.out.println("Potok jest pusty!");
             // tu synchro proces powinien czekać !
@@ -157,18 +162,22 @@ public class IPC {
                System.out.println("Odebrano komunikat" + " " + bufor + " od procesu: " + pn + " ");
             return bufor;
         } else if (count < pipes.get(des).occupied_bytes) {
- pipes.get(des).lock();
+         pipes.get(des).lock();
             bufor = pipes.get(des).Dane.substring(0, count);
             //zwraca tylko czesc stringa 
             // String partData = pipes.get(des).Dane.
             pipes.get(des).free_bytes += bufor.length();
              pipes.get(des).unlock();
+             des = -1;
             return bufor;
         } else {
             System.out.println("funkcja read - blad!");
-            return "-1";
+            des=-1;
+            return "";
         }
 
     }
+   return "";
+   }
+   }
 
-}
