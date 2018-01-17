@@ -76,7 +76,8 @@ public class Interpreter {
 
     private int stan = 0; // command = 0, param1 = 1; param2 = 2;  //param3 = 3; ???? 
     
-    
+    public String program_oczekujacy;
+    public String proces_oczekujacy;
 
     public Interpreter(MemoryManagment RAM, FileSystem fileSystem, PCB PCBbox)
 
@@ -189,7 +190,17 @@ public class Interpreter {
     private boolean isLabel(StringBuilder command) {
         return command.length() > 0 && command.charAt(command.length() - 1) == ':';
     }
-
+    
+     private boolean isLabel(String command) {char i = 0;
+    	if(command.length() > 3) {
+    	i=command.charAt(command.length() - 2);
+        }
+        return command.length() > 0 && new StringBuilder().append(i).toString().equals(":");
+       
+    }
+    
+    String program2;
+    
     public String getProgram(String procesName) {
         char znak;
         String program = "";
@@ -215,7 +226,9 @@ public class Interpreter {
             }
 
         }
-        return program;
+        program2 = program;
+        program = "";
+        return program2;
     }
 
     // Follow the recognized command
@@ -257,12 +270,13 @@ public class Interpreter {
                 }
                 break;
 
-            case "JM": // Skok do etykiety JM
-                if (labels.containsKey(param1) && getValue("C") != 0) {
+               case "JM": // Skok do etykiety JM
+            	 if (labels.containsKey(param1) && getValue("C") != 0) {
 
                     // setValue("C", labels.get(param1));
                     setValue("C", getValue("C") - 1);
-                    commandCounter = labels.get(param1);
+                    PCBbox.getproces(PCBbox.working()).commandCounter = labels.get(param1);
+                  
                 }
                 break;
 
@@ -286,11 +300,25 @@ public class Interpreter {
             case "RC": // czytanie komunikatu;
 
                 int count = Integer.parseInt(param1);
-                  System.out.println("lICZNIK: " + count);
-                String received = pipes.read(count, param2);
-                System.out.println(received);
+                System.out.println("lICZNIK: " + count);
+                
+                
              //   pipes.closepipe(des);
-                fileSystem.createFileWithContent("potok", received);
+               // fileSystem.createFileWithContent("potok", received);
+                boolean exists = false;
+                for (int i = 0; i < pipes.pipes.size(); i++) {
+                    if (pipes.pipes.get(i).pn.equals(param2)) { 
+                        exists = true;
+                    }
+                }
+                
+                if(exists == false){
+                    program_oczekujacy = program2;
+                    proces_oczekujacy = PCBbox.working();
+                }
+                
+                String received = pipes.read(count, param2, PCBbox);
+                System.out.println(received);
                 
                 //ProcessorManager.RUNNING.pcb.receivedMsg = received;
                 //fileSystem.createEmptyFile(ProcessorManager.RUNNING.GetName());
@@ -298,8 +326,25 @@ public class Interpreter {
                 break;
 
             case "SC": // -- Wysłanie komunikatu;
-                int des = pipes.openpipe(); 
-                pipes.write(param2, param1, des);
+                int des = pipes.openpipe();
+                pipes.pipes.get(des).od_kogo = PCBbox.working();
+                for(int i=0;i<PCBbox.proceses.size(); i++){
+                   
+                if(PCBbox.proceses.get(i).pid.equals(param1))
+                {
+                    if(PCBbox.proceses.get(i).state == 3){
+                        PCBbox.proceses.get(i).state = 4;
+                        String s = PCBbox.working();
+                        PCBbox.getproces(s).state=2;
+                        
+                    }
+                    pipes.write(param2, param1, des);
+                    break;
+                }
+                else if(PCBbox.proceses.get(i)==PCBbox.proceses.get(PCBbox.proceses.size()-1)){
+                 System.out.print("Proces do ktorego chcesz wyslac nie istnieje\n");
+               }
+                }
                // (pipes.get(des));
                 break;
 
@@ -363,6 +408,7 @@ public class Interpreter {
         StringBuilder command = new StringBuilder();
         StringBuilder param1 = new StringBuilder();
         StringBuilder param2 = new StringBuilder();
+        String s_etykieta="";
 
         for (Character c : program.toCharArray()) {
             if (c == '\n') {
@@ -370,10 +416,12 @@ public class Interpreter {
                 stan = 0;
                 found = false;
 
-                //System.out.println(command.toString() + " " + param1.toString() + " " + param1.toString()
-                //+ " executor: " + ProcessorManager.RUNNING.GetName());
-
-                boolean rozkazToEtykieta = isLabel(command);
+               
+                if(program.contains(" :")){
+                    s_etykieta = program.replaceAll(" :", ":");
+                }
+              
+                boolean rozkazToEtykieta = isLabel(s_etykieta);
                 boolean poprawnoscRejestru = rejestry.contains(param1.toString());
                 boolean poprawnoscRozkazu = rozkazy.contains(command.toString());
                 boolean argDrugiJestRejestrem = rejestry.contains(param2.toString());
