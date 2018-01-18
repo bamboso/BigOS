@@ -1,18 +1,16 @@
 package Komunikacja_Miedzyprocesowa;
 
-
 import java.util.Vector;
 import proces.PCB;
-
 
 /**
  * @author Olga Kryspin
  */
 public class IPC {
-   
+
     public Vector<Pipe> pipes = new Vector(); //wszystkie istniejące łącza w systemie
     public PCB PCBbox;
-    
+
     private int open(Pipe pipe, char sign) // otwiera w trybie:.. 
     {
         if (sign == 'w') // ...zapisu
@@ -72,6 +70,7 @@ public class IPC {
     //4. kończe zapis na końcu unlock
     //-ustawiam pola occupied bytes i free bytes i pn 
     //5. zwracam faktyczną liczbę zapisanych danych 
+    
     public int write(String komunikat, String pn, int des) {
         boolean exists = true;
         this.PCBbox = PCBbox;
@@ -87,33 +86,35 @@ public class IPC {
             return -1;
         }
 
-        //sprawdzam czy procesy są spokrewnione 
-        //nie muszę sprawdzać bo wszystkie są .. 
-       
-        //... jeżeli tak to dalej jezeli nie to :
-        //  System.out.println("Procesy nie sa spokrewnione!");
-        //  return -1;
-
+        
         if (pipes.get(des).lock == true) {
-            System.out.println("Lacze jest zablokowane"); // tutaj musze użyć synchro 
+            System.out.println("Lacze jest zablokowane"); 
         } else {
             (pipes.get(des)).lock();
         }
         (pipes.get(des)).zapis();
         (pipes.get(des)).pn = pn;
-        
 
         int length = komunikat.length();
-//        if (length == pipes.get(des).buffer_lenght) //kiedy komunikat zajmuje caly bufor 
-//        {
-            (pipes.get(des)).Dane = komunikat;
-            (pipes.get(des)).occupied_bytes = length;
-            (pipes.get(des)).free_bytes = (pipes.get(des)).buffer_lenght - length;
-             System.out.println("Wyslano komunikat" + " " + komunikat + " dla procesu: " + pn + " ");
-      //  }
+       if (length <= pipes.get(des).buffer_lenght) //kiedy komunikat zajmuje caly bufor 
+      {
+        (pipes.get(des)).Dane = komunikat;
+        (pipes.get(des)).occupied_bytes = length;
+        (pipes.get(des)).free_bytes = (pipes.get(des)).buffer_lenght - length;
+        System.out.println("Wyslano komunikat" + " " + komunikat + " dla procesu: " + pn + " ");
+        //  }
         //(pipes.get(des)).Dane = komunikat;
-
-        return (pipes.get(des)).occupied_bytes;
+       }
+       else 
+       {
+           System.out.println("Komunikat jest za duzy! ");
+           (pipes.get(des)).Dane = komunikat.substring(0,16);
+        (pipes.get(des)).occupied_bytes = length;
+        (pipes.get(des)).free_bytes = (pipes.get(des)).buffer_lenght - length;
+        System.out.println("Wyslano komunikat" + " " + komunikat.substring(0, 16) + " dla procesu: " + pn + " ");
+          
+       } 
+       return (pipes.get(des)).occupied_bytes;
 
     }
     //___________________________________________________________
@@ -124,15 +125,15 @@ public class IPC {
     //-ustawiam pola occupied bytes i free bytes i pn 
     //4. zwracam komunikat
 
-   public String read(int count,String pn,PCB PCBbox) {
+    public String read(int count, String pn, PCB PCBbox) {
         boolean exists = false;
         String bufor;
-        int des = -1; 
+        int des = -1;
         this.PCBbox = PCBbox;
 
         for (int i = 0; i < pipes.size(); i++) {
             if (pipes.get(i).pn.equals(pn)) {
-                des = i; 
+                des = i;
                 exists = true;
             }
         }
@@ -140,44 +141,44 @@ public class IPC {
         if (exists == false) {
             System.out.println("Takie lacze JESZCZE nie istnieje!");
             String s = PCBbox.working();
-            PCBbox.getproces(s).state=3;
+            PCBbox.getproces(s).state = 3;
             //return "-1";
         }
 
-       // int des = 0;
+        // int des = 0;
         //Pipe firstElement = pipes.firstElement();
         //des = pipes.indexOf(firstElement);
-        if(des!=-1){
-        if (pipes.get(des).occupied_bytes == 0) {
-            System.out.println("Potok jest pusty!");
-            // tu synchro proces powinien czekać !
+        if (des != -1) {
+            if (pipes.get(des).occupied_bytes == 0) {
+                System.out.println("Potok jest pusty!");
+                pipes.get(des).pn = "root";  /////////////////////////////////////////////// 
+                // tu synchro proces powinien czekać !
+
+            }
+
+            if (count >= pipes.get(des).occupied_bytes) {
+                pipes.get(des).lock();
+                bufor = pipes.get(des).Dane.substring(0, count - 1);
+                pipes.get(des).free_bytes += bufor.length();
+                pipes.get(des).unlock();
+                System.out.println("Odebrano komunikat" + " " + bufor + " od procesu: " + pipes.get(des).od_kogo + " "); /// 
+                return bufor;
+            } else if (count < pipes.get(des).occupied_bytes) {
+                pipes.get(des).lock();
+                bufor = pipes.get(des).Dane.substring(0, count);
+                //zwraca tylko czesc stringa 
+                // String partData = pipes.get(des).Dane.
+                pipes.get(des).free_bytes += bufor.length();
+                pipes.get(des).unlock();
+                des = -1;
+                return bufor;
+            } else {
+                System.out.println("funkcja read - blad!");
+                des = -1;
+                return "";
+            }
 
         }
-
-        if (count >= pipes.get(des).occupied_bytes) {
-            pipes.get(des).lock();
-            bufor = pipes.get(des).Dane.substring(0, count - 1);
-            pipes.get(des).free_bytes += bufor.length();
-             pipes.get(des).unlock();
-               System.out.println("Odebrano komunikat" + " " + bufor + " od procesu: " + pn + " ");
-            return bufor;
-        } else if (count < pipes.get(des).occupied_bytes) {
-         pipes.get(des).lock();
-            bufor = pipes.get(des).Dane.substring(0, count);
-            //zwraca tylko czesc stringa 
-            // String partData = pipes.get(des).Dane.
-            pipes.get(des).free_bytes += bufor.length();
-             pipes.get(des).unlock();
-             des = -1;
-            return bufor;
-        } else {
-            System.out.println("funkcja read - blad!");
-            des=-1;
-            return "";
-        }
-
+        return "";
     }
-   return "";
-   }
-   }
-
+}
